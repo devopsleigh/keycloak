@@ -2,6 +2,7 @@ services:
   postgresql:
     image: postgres:latest
     container_name: ${SERVICE_NAME}_db
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=keycloak
       - POSTGRES_DB=keycloak
