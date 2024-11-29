@@ -1,10 +1,12 @@
 services:
 
   keycloak_db:
-    image: postgres:latest
+    image: postgres:16
     container_name: keycloak_db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
       interval: 10s
       timeout: 10s
       retries: 10
@@ -14,23 +16,25 @@ services:
       - POSTGRES_DB=keycloak
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - './db_data:/var/lib/postgresql/data'
+      - ./db_data:/var/lib/postgresql/data
     networks:
       - default
 
   keycloak:
-    image: quay.io/keycloak/keycloak:22.0.3
+    image: quay.io/keycloak/keycloak:latest
     container_name: keycloak
     restart: unless-stopped
     command: start
+#    ports:
+#      - 8080:8080
     depends_on:
       keycloak_db:
         condition: service_healthy
     environment:
       - KC_PROXY_ADDRESS_FORWARDING=true
-      - KC_HOSTNAME_STRICT=false
+      #- KC_HOSTNAME_STRICT=false
       - KC_HOSTNAME=${SERVICE_NAME}.${MY_DOMAIN}
-      - KC_PROXY=edge
+      - KC_PROXY_HEADERS=xforwarded
       - KC_HTTP_ENABLED=true
       - KC_DB=postgres
       - KC_DB_USERNAME=keycloak
@@ -38,31 +42,44 @@ services:
       - KC_DB_URL_HOST=${SERVICE_NAME}_db
       - KC_DB_URL_PORT=5432
       - KC_DB_URL_DATABASE=keycloak
+      - KC_HEALTH_ENABLED=true
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USER}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:${SERVICE_INTERNAL_PORT}/health/ready"]
+    #   interval: 15s
+    #   timeout: 2s
+    #   retries: 15
     security_opt:
       - no-new-privileges:true
     networks:
       - default
       - proxy
     labels:
-      - "homepage.name=Keycloak"
-      - "homepage.description=Single sign-on authentication"
-      - "homepage.icon=keycloak"
-      - "homepage.href=https://${SERVICE_NAME}.${MY_DOMAIN}"
-      - "homepage.group=Security"
-      - "traefik.enable=true"
-      - "traefik.http.routers.${SERVICE_NAME}.entrypoints=http"
-      - "traefik.http.routers.${SERVICE_NAME}.rule=Host(`${SERVICE_NAME}.${MY_DOMAIN}`)"
-      - "traefik.http.routers.${SERVICE_NAME}.middlewares=default-whitelist@file"
-      - "traefik.http.middlewares.${SERVICE_NAME}-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.${SERVICE_NAME}.middlewares=${SERVICE_NAME}-https-redirect"
-      - "traefik.http.routers.${SERVICE_NAME}-secure.entrypoints=https"
-      - "traefik.http.routers.${SERVICE_NAME}-secure.rule=Host(`${SERVICE_NAME}.${MY_DOMAIN}`)"
-      - "traefik.http.routers.${SERVICE_NAME}-secure.tls=true"
-      - "traefik.http.routers.${SERVICE_NAME}-secure.service=${SERVICE_NAME}"
-      - "traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port=${SERVICE_INTERNAL_PORT}"
-      - "traefik.docker.network=proxy"
+      - homepage.name=Keycloak
+      - homepage.description=Single sign-on authentication
+      - homepage.icon=keycloak
+      - homepage.href=https://${SERVICE_NAME}.${MY_DOMAIN}
+      - homepage.group=Security
+      - traefik.enable=true
+      - traefik.http.routers.${SERVICE_NAME}.entrypoints=http
+      - traefik.http.routers.${SERVICE_NAME}.rule=Host(`${SERVICE_NAME}.${MY_DOMAIN}`)
+      - traefik.http.routers.${SERVICE_NAME}.middlewares=default-whitelist@file
+      - traefik.http.middlewares.${SERVICE_NAME}-https-redirect.redirectscheme.scheme=https
+      - traefik.http.routers.${SERVICE_NAME}.middlewares=${SERVICE_NAME}-https-redirect
+      - traefik.http.routers.${SERVICE_NAME}-secure.entrypoints=https
+      - traefik.http.routers.${SERVICE_NAME}-secure.rule=Host(`${SERVICE_NAME}.${MY_DOMAIN}`)
+      - traefik.http.routers.${SERVICE_NAME}-secure.tls=true
+      - traefik.http.routers.${SERVICE_NAME}-secure.service=${SERVICE_NAME}
+      - traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port=${SERVICE_INTERNAL_PORT}
+      - traefik.docker.network=proxy
+  # mail:
+  #   image: bytemark/smtp:latest
+  #   container_name: mail
+  #   mem_limit: 50m
+  #   restart: always
+  #   networks:
+  #     - default
 
 networks:
   proxy:
